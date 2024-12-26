@@ -1,0 +1,19 @@
+import sqlite3
+
+# Connect to SQLite
+conn = sqlite3.connect('shortener.db')
+
+# Create table
+conn.execute('''
+    CREATE TABLE url_mappings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        short_code TEXT NOT NULL UNIQUE,
+        long_url TEXT NOT NULL
+    );
+''')
+
+# Example mapping
+conn.execute('INSERT INTO url_mappings (short_code, long_url) VALUES (?, ?)', ('abc123', 'https://example.com/page1'))
+
+conn.commit()
+conn.close()
