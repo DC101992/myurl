@@ -1,60 +1,38 @@
+import os
 from flask import Flask, request, jsonify
 import sqlite3
-import random
-import string
 
 app = Flask(__name__)
 
-# Function to create a random short code (You can improve this logic if needed)
-def generate_short_code():
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+@app.route("/shorten", methods=["POST"])
+def shorten():
+    long_url = request.json.get("long_url")
+    if not long_url:
+        return jsonify({"error": "No URL provided"}), 400
 
-@app.route('/shorten', methods=['POST'])
-def shorten_url():
-    try:
-        # Step 1: Parse the incoming JSON data
-        data = request.get_json()
-        if not data or 'url' not in data:
-            return jsonify({'error': 'No URL provided'}), 400
+    # Generate short URL logic here
+    short_code = generate_short_code(long_url)
 
-        long_url = data['url']
+    # Store the mapping in the database
+    save_url_mapping(long_url, short_code)
 
-        # Step 2: Connect to the SQLite database and check if it exists (you need to handle this part in the database)
-        conn = sqlite3.connect('urls.db')  # Ensure this is in the same directory or provide the full path
-        cursor = conn.cursor()
+    short_url = f"https://myurl-ck9x.onrender.com/{short_code}"
+    return jsonify({"short_url": short_url})
 
-        # Step 3: Check if the long URL is already in the database
-        cursor.execute("SELECT short_code FROM urls WHERE long_url = ?", (long_url,))
-        row = cursor.fetchone()
+def generate_short_code(long_url):
+    # Simple example of generating a short code (you can use any logic here)
+    return hash(long_url) % 10000  # Just an example, for illustration purposes
 
-        if row:
-            # If the URL already has a short code, return it
-            short_code = row[0]
-        else:
-            # Generate a new short code
-            short_code = generate_short_code()
+def save_url_mapping(long_url, short_code):
+    # Save the long_url and short_code in the database
+    conn = sqlite3.connect('urls.db')
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS urls (id INTEGER PRIMARY KEY AUTOINCREMENT, long_url TEXT, short_code TEXT)")
+    cursor.execute("INSERT INTO urls (long_url, short_code) VALUES (?, ?)", (long_url, short_code))
+    conn.commit()
+    conn.close()
 
-            # Step 4: Insert the new long URL and short code into the database
-            cursor.execute("INSERT INTO urls (long_url, short_code) VALUES (?, ?)", (long_url, short_code))
-            conn.commit()
-
-        conn.close()
-
-        # Step 5: Construct the full shortened URL
-        shortened_url = f"https://myurl-ck9x.onrender.com/{short_code}"
-        
-        # Step 6: Return the shortened URL as a JSON response
-        return jsonify({'shortened_url': shortened_url}), 200
-
-    except sqlite3.Error as e:
-        # Handle database related errors
-        return jsonify({'error': f'Database error: {str(e)}'}), 500
-
-    except Exception as e:
-        # Catch any general errors
-        return jsonify({'error': f'An error occurred: {str(e)}'}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
-
-
+if __name__ == "__main__":
+    # Use the PORT environment variable or default to 5000 for local development
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
